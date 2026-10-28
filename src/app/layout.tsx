@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Noto_Sans_TC, Noto_Serif_TC } from "next/font/google";
+import { AppShell } from "@/components/AppShell";
 import "./globals.css";
 
 const body = Noto_Sans_TC({
@@ -17,7 +18,7 @@ const display = Noto_Serif_TC({
 export const metadata: Metadata = {
   title: "撲克學習站｜翻前範圍設計器",
   description:
-    "個人撲克學習站 V1：互動式 13×13 翻前範圍設計與本機儲存。無真實金流、無多人對戰。",
+    "個人撲克學習站 V1：互動式 13×13 翻前範圍設計，SQLite 本機儲存。無真實金流、無多人對戰。",
 };
 
 export default function RootLayout({
@@ -28,7 +29,7 @@ export default function RootLayout({
   return (
     <html lang="zh-Hant">
       <body className={`${body.variable} ${display.variable} antialiased`}>
-        {children}
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

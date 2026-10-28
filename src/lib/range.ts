@@ -79,7 +79,11 @@ export type RangeChart = {
   updatedAt: string;
 };
 
+/** Legacy localStorage key (pre-DB); used once for migration. */
 export const STORAGE_KEY = "poker-ranges-v1";
+/** Client-side SWR-style cache of ranges from the API/DB. */
+export const CACHE_KEY = "poker-ranges-cache-v1";
+export const MIGRATION_FLAG_KEY = "poker-ranges-migrated-v1";
 
 export function clampFrequency(n: number): number {
   if (!Number.isFinite(n)) return 100;
@@ -213,7 +217,7 @@ export function createRange(
   };
 }
 
-function normalizeChart(raw: unknown): RangeChart | null {
+export function normalizeRange(raw: unknown): RangeChart | null {
   if (!raw || typeof raw !== "object") return null;
   const obj = raw as Partial<RangeChart> & { cells?: unknown };
   if (typeof obj.id !== "string") return null;
@@ -232,39 +236,41 @@ function normalizeChart(raw: unknown): RangeChart | null {
   };
 }
 
-export function loadRanges(): RangeChart[] {
+export function parseRangeList(raw: unknown): RangeChart[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map(normalizeRange)
+    .filter((r): r is RangeChart => r !== null);
+}
+
+/** Read client cache (or legacy localStorage key). */
+export function loadCachedRanges(): RangeChart[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .map(normalizeChart)
-      .filter((r): r is RangeChart => r !== null);
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (cached) return parseRangeList(JSON.parse(cached));
+    const legacy = localStorage.getItem(STORAGE_KEY);
+    if (legacy) return parseRangeList(JSON.parse(legacy));
+    return [];
   } catch {
     return [];
   }
 }
 
-export function saveRanges(ranges: RangeChart[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(ranges));
+export function saveCachedRanges(ranges: RangeChart[]): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(CACHE_KEY, JSON.stringify(ranges));
 }
 
-export function upsertRange(range: RangeChart): RangeChart[] {
-  const list = loadRanges();
-  const idx = list.findIndex((r) => r.id === range.id);
-  const next = { ...range, updatedAt: new Date().toISOString() };
-  if (idx >= 0) list[idx] = next;
-  else list.unshift(next);
-  saveRanges(list);
-  return list;
-}
-
-export function deleteRange(id: string): RangeChart[] {
-  const list = loadRanges().filter((r) => r.id !== id);
-  saveRanges(list);
-  return list;
+export function loadLegacyRangesForMigration(): RangeChart[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const legacy = localStorage.getItem(STORAGE_KEY);
+    if (!legacy) return [];
+    return parseRangeList(JSON.parse(legacy));
+  } catch {
+    return [];
+  }
 }
 
 export function actionMeta(id: ActionId) {
