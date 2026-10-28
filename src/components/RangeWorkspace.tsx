@@ -5,9 +5,12 @@ import { RangeGrid } from "@/components/RangeGrid";
 import {
   ACTIONS,
   ActionId,
+  CellState,
   POSITIONS,
   Position,
   RangeChart,
+  cellState,
+  clampFrequency,
   createRange,
   deleteRange,
   loadRanges,
@@ -19,6 +22,7 @@ export function RangeWorkspace() {
   const [list, setList] = useState<RangeChart[]>([]);
   const [current, setCurrent] = useState<RangeChart>(() => createRange());
   const [brush, setBrush] = useState<ActionId>("raise");
+  const [brushFrequency, setBrushFrequency] = useState(100);
   const [savedFlash, setSavedFlash] = useState(false);
 
   useEffect(() => {
@@ -28,11 +32,31 @@ export function RangeWorkspace() {
     setHydrated(true);
   }, []);
 
-  const onPaint = useCallback((hand: string, action: ActionId) => {
+  const onPaint = useCallback(
+    (hand: string, action: ActionId, frequency: number) => {
+      setCurrent((prev) => ({
+        ...prev,
+        cells: {
+          ...prev.cells,
+          [hand]:
+            action === "fold"
+              ? cellState("fold", 100)
+              : cellState(action, frequency),
+        },
+      }));
+    },
+    [],
+  );
+
+  const onSetCell = useCallback((hand: string, state: CellState) => {
     setCurrent((prev) => ({
       ...prev,
-      cells: { ...prev.cells, [hand]: action },
+      cells: { ...prev.cells, [hand]: state },
     }));
+    if (state.action !== "fold") {
+      setBrush(state.action);
+      setBrushFrequency(state.frequency);
+    }
   }, []);
 
   function handleSave() {
@@ -158,7 +182,37 @@ export function RangeWorkspace() {
           })}
         </div>
 
-        <RangeGrid cells={current.cells} brush={brush} onPaint={onPaint} />
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="inline-flex items-center gap-2 text-sm text-[var(--ink)]">
+            <span className="font-medium">畫筆頻率</span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={brushFrequency}
+              onChange={(e) =>
+                setBrushFrequency(clampFrequency(Number(e.target.value)))
+              }
+              className="w-36 accent-[var(--accent)]"
+              aria-label="畫筆頻率"
+            />
+            <span className="w-10 tabular-nums text-[var(--muted)]">
+              {brushFrequency}%
+            </span>
+          </label>
+          <span className="text-xs text-[var(--muted)]">
+            左鍵拖曳套用此頻率；右鍵可單獨調整某格。
+          </span>
+        </div>
+
+        <RangeGrid
+          cells={current.cells}
+          brush={brush}
+          brushFrequency={brushFrequency}
+          onPaint={onPaint}
+          onSetCell={onSetCell}
+        />
 
         <div className="flex flex-wrap gap-3">
           <button

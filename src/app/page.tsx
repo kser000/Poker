@@ -11,7 +11,7 @@ export default function Home() {
           翻前範圍設計器
         </h1>
         <p className="mt-2 max-w-2xl text-base leading-relaxed text-[var(--muted)]">
-          點選或拖曳為 169 種起手牌標記行動，命名後存到本機。筆記與策略記錄將於之後版本加入。
+          拖曳為 169 種起手牌標記行動與頻率，右鍵調整比例，命名後存到本機。筆記與策略記錄將於之後版本加入。
         </p>
       </header>
 
