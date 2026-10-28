@@ -34,16 +34,33 @@ export function RangeWorkspace() {
 
   const onPaint = useCallback(
     (hand: string, action: ActionId, frequency: number) => {
-      setCurrent((prev) => ({
-        ...prev,
-        cells: {
-          ...prev.cells,
-          [hand]:
-            action === "fold"
-              ? cellState("fold", 100)
-              : cellState(action, frequency),
-        },
-      }));
+      setCurrent((prev) => {
+        const existing = prev.cells[hand] ?? cellState("fold", 100);
+        const nextFreq = clampFrequency(frequency);
+        const matchesBrush =
+          existing.action === action &&
+          (action === "fold" ||
+            clampFrequency(existing.frequency) === nextFreq);
+
+        // Same brush action+frequency → clear (empty / fold).
+        if (matchesBrush && action !== "fold") {
+          return {
+            ...prev,
+            cells: { ...prev.cells, [hand]: cellState("fold", 100) },
+          };
+        }
+
+        return {
+          ...prev,
+          cells: {
+            ...prev.cells,
+            [hand]:
+              action === "fold"
+                ? cellState("fold", 100)
+                : cellState(action, nextFreq),
+          },
+        };
+      });
     },
     [],
   );

@@ -208,7 +208,7 @@ export function RangeGrid({
       </div>
 
       <p className="mt-3 text-sm text-[var(--muted)]">
-        左鍵拖曳以上色；右鍵點格子設定頻率（預設 100%）。對角線為對子，右上同花（s），左下雜色（o）。
+        左鍵拖曳上色；再點相同行動與頻率可清除。右鍵設定頻率（預設 100%）。對角線為對子，右上同花（s），左下雜色（o）。
       </p>
 
       <ul className="mt-2 flex flex-wrap gap-3 text-xs text-[var(--muted)]">
