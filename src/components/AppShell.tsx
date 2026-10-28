@@ -2,146 +2,129 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
-
-const SIDEBAR_POS_KEY = "poker-sidebar-pos-v1";
-const SIDEBAR_COLLAPSE_KEY = "poker-sidebar-collapsed-v1";
+import { useEffect, useState } from "react";
 
 const NAV = [
   { href: "/designer", label: "範圍設計器" },
   { href: "/ranges", label: "我的範圍表" },
 ] as const;
 
-type Pos = { x: number; y: number };
+function HamburgerIcon({ open }: { open: boolean }) {
+  return (
+    <span className="relative block size-5" aria-hidden>
+      <span
+        className="absolute left-0 block h-[2px] w-5 rounded-full bg-current transition-transform duration-200"
+        style={{
+          top: open ? 9 : 3,
+          transform: open ? "rotate(45deg)" : undefined,
+        }}
+      />
+      <span
+        className="absolute left-0 top-[9px] block h-[2px] w-5 rounded-full bg-current transition-opacity duration-200"
+        style={{ opacity: open ? 0 : 1 }}
+      />
+      <span
+        className="absolute left-0 block h-[2px] w-5 rounded-full bg-current transition-transform duration-200"
+        style={{
+          top: open ? 9 : 15,
+          transform: open ? "rotate(-45deg)" : undefined,
+        }}
+      />
+    </span>
+  );
+}
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(false);
-  const [pos, setPos] = useState<Pos>({ x: 12, y: 12 });
-  const [ready, setReady] = useState(false);
-  const drag = useRef<{
-    startX: number;
-    startY: number;
-    origX: number;
-    origY: number;
-  } | null>(null);
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(SIDEBAR_POS_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as Pos;
-        if (typeof parsed.x === "number" && typeof parsed.y === "number") {
-          setPos(parsed);
-        }
-      }
-      setCollapsed(localStorage.getItem(SIDEBAR_COLLAPSE_KEY) === "1");
-    } catch {
-      /* ignore */
+    setOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
     }
-    setReady(true);
-  }, []);
-
-  useEffect(() => {
-    if (!ready) return;
-    localStorage.setItem(SIDEBAR_POS_KEY, JSON.stringify(pos));
-  }, [pos, ready]);
-
-  useEffect(() => {
-    if (!ready) return;
-    localStorage.setItem(SIDEBAR_COLLAPSE_KEY, collapsed ? "1" : "0");
-  }, [collapsed, ready]);
-
-  function onDragStart(e: React.PointerEvent) {
-    if ((e.target as HTMLElement).closest("a,button")) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
-    drag.current = {
-      startX: e.clientX,
-      startY: e.clientY,
-      origX: pos.x,
-      origY: pos.y,
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
     };
-  }
-
-  function onDragMove(e: React.PointerEvent) {
-    if (!drag.current) return;
-    const dx = e.clientX - drag.current.startX;
-    const dy = e.clientY - drag.current.startY;
-    setPos({
-      x: Math.max(0, Math.min(window.innerWidth - 80, drag.current.origX + dx)),
-      y: Math.max(0, Math.min(window.innerHeight - 80, drag.current.origY + dy)),
-    });
-  }
-
-  function onDragEnd() {
-    drag.current = null;
-  }
+  }, [open]);
 
   return (
     <div className="relative min-h-screen">
-      <aside
-        className="fixed z-40 select-none rounded-xl border border-[var(--line)] bg-[color-mix(in_oklab,var(--panel)_94%,transparent)] shadow-[0_12px_36px_rgba(20,40,28,0.18)] backdrop-blur-md"
-        style={{
-          left: pos.x,
-          top: pos.y,
-          width: collapsed ? "auto" : 200,
-        }}
-        onPointerDown={onDragStart}
-        onPointerMove={onDragMove}
-        onPointerUp={onDragEnd}
-        onPointerCancel={onDragEnd}
+      <button
+        type="button"
+        className="fixed left-3 top-3 z-50 inline-flex size-11 items-center justify-center rounded-full border border-[var(--line)] bg-[color-mix(in_oklab,var(--panel)_94%,transparent)] text-[var(--ink)] shadow-[0_8px_24px_rgba(20,40,28,0.16)] backdrop-blur-md transition hover:bg-white"
+        aria-label={open ? "關閉選單" : "開啟選單"}
+        aria-expanded={open}
+        aria-controls="main-drawer"
+        onClick={() => setOpen((v) => !v)}
       >
-        <div className="flex cursor-grab items-center justify-between gap-2 px-3 py-2 active:cursor-grabbing">
-          <div className="min-w-0">
-            <p className="truncate font-[family-name:var(--font-display)] text-sm font-bold text-[var(--felt-deep)]">
+        <HamburgerIcon open={open} />
+      </button>
+
+      {open ? (
+        <button
+          type="button"
+          className="fixed inset-0 z-40 bg-[color-mix(in_oklab,var(--ink)_45%,transparent)] backdrop-blur-[2px]"
+          aria-label="關閉選單背景"
+          onClick={() => setOpen(false)}
+        />
+      ) : null}
+
+      <aside
+        id="main-drawer"
+        className="fixed left-0 top-0 z-50 flex h-full w-[min(280px,86vw)] flex-col border-r border-[var(--line)] bg-[var(--panel)] shadow-[8px_0_40px_rgba(20,40,28,0.22)] transition-transform duration-200 ease-out"
+        style={{
+          transform: open ? "translateX(0)" : "translateX(-105%)",
+          pointerEvents: open ? "auto" : "none",
+        }}
+        aria-hidden={!open}
+      >
+        <div className="flex items-center gap-3 border-b border-[var(--line)] px-4 py-4 pl-16">
+          <div>
+            <p className="font-[family-name:var(--font-display)] text-lg font-bold text-[var(--felt-deep)]">
               撲克學習站
             </p>
-            {!collapsed ? (
-              <p className="text-[10px] text-[var(--muted)]">拖曳可移動選單</p>
-            ) : null}
+            <p className="text-xs text-[var(--muted)]">導覽選單</p>
           </div>
-          <button
-            type="button"
-            className="shrink-0 rounded-md border border-[var(--line)] bg-white/70 px-2 py-1 text-xs text-[var(--ink)] hover:bg-white"
-            onClick={() => setCollapsed((c) => !c)}
-            aria-expanded={!collapsed}
-            aria-label={collapsed ? "展開側欄" : "收合側欄"}
-          >
-            {collapsed ? "展開" : "收合"}
-          </button>
         </div>
 
-        {!collapsed ? (
-          <nav className="border-t border-[var(--line)] px-2 py-2" aria-label="主要導覽">
-            <ul className="space-y-1">
-              {NAV.map((item) => {
-                const active =
-                  pathname === item.href ||
-                  pathname.startsWith(`${item.href}/`);
-                return (
-                  <li key={item.href}>
-                    <Link
-                      href={item.href}
-                      className="block rounded-md px-2.5 py-2 text-sm transition"
-                      style={{
-                        backgroundColor: active
-                          ? "color-mix(in oklab, var(--accent) 18%, transparent)"
-                          : "transparent",
-                        color: active ? "var(--accent)" : "var(--ink)",
-                        fontWeight: active ? 600 : 500,
-                      }}
-                    >
-                      {item.label}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </nav>
-        ) : null}
+        <nav className="flex-1 px-3 py-3" aria-label="主要導覽">
+          <ul className="space-y-1">
+            {NAV.map((item) => {
+              const active =
+                pathname === item.href || pathname.startsWith(`${item.href}/`);
+              return (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    className="block rounded-lg px-3 py-3 text-base transition"
+                    style={{
+                      backgroundColor: active
+                        ? "color-mix(in oklab, var(--accent) 16%, transparent)"
+                        : "transparent",
+                      color: active ? "var(--accent)" : "var(--ink)",
+                      fontWeight: active ? 700 : 500,
+                    }}
+                    onClick={() => setOpen(false)}
+                  >
+                    {item.label}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
       </aside>
 
-      <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
+      <div className="mx-auto w-full max-w-6xl px-4 py-8 pt-16 sm:px-6 sm:py-12 sm:pt-16">
         {children}
       </div>
     </div>

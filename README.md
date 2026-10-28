@@ -25,7 +25,7 @@ npm run dev
 - 13×13 矩陣：拖曳上色、多色疊加頻率、懸停放大、右鍵調頻率
 - 行動：棄牌／跟注／加注／全下
 - SQLite 持久化 + localStorage 客戶端快取；舊 localStorage 可自動遷移
-- 左上可拖曳／收合導覽側欄
+- 左上漢堡選單（YouTube 式抽屜導覽）
 
 ## 資料目錄（E:\Poker）
 
