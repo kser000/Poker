@@ -5,10 +5,12 @@ import {
   ACTIONS,
   ActionId,
   CellMap,
-  CellState,
   RANKS,
   actionMeta,
+  cellSummary,
+  cellTotal,
   clampFrequency,
+  emptyCell,
   handLabel,
 } from "@/lib/range";
 
@@ -17,13 +19,11 @@ type Props = {
   brush: ActionId;
   brushFrequency: number;
   onPaint: (hand: string, action: ActionId, frequency: number) => void;
-  onSetCell: (hand: string, state: CellState) => void;
+  onBrushFrequencyChange: (frequency: number) => void;
 };
 
 type FreqMenu = {
   hand: string;
-  action: ActionId;
-  frequency: number;
   x: number;
   y: number;
 };
@@ -33,7 +33,7 @@ export function RangeGrid({
   brush,
   brushFrequency,
   onPaint,
-  onSetCell,
+  onBrushFrequencyChange,
 }: Props) {
   const painting = useRef(false);
   const lastHand = useRef<string | null>(null);
@@ -77,11 +77,8 @@ export function RangeGrid({
   function applyMenu() {
     if (!menu) return;
     const freq = clampFrequency(draftFreq);
-    const action = menu.action === "fold" && freq > 0 ? brush : menu.action;
-    onSetCell(menu.hand, {
-      action: freq <= 0 ? "fold" : action,
-      frequency: freq <= 0 ? 100 : freq,
-    });
+    onBrushFrequencyChange(freq);
+    onPaint(menu.hand, brush, freq);
     setMenu(null);
   }
 
@@ -124,19 +121,12 @@ export function RangeGrid({
           if (!hand) return;
           e.preventDefault();
           painting.current = false;
-          const cell = cells[hand] ?? { action: "fold" as ActionId, frequency: 100 };
-          const action =
-            cell.action === "fold" ? brush : cell.action;
-          const frequency =
-            cell.action === "fold" ? brushFrequency : cell.frequency;
-          setDraftFreq(frequency);
-          setMenu({
-            hand,
-            action,
-            frequency,
-            x: e.clientX,
-            y: e.clientY,
-          });
+          const cell = cells[hand] ?? emptyCell();
+          const existing = cell.parts.find((p) => p.action === brush);
+          setDraftFreq(
+            existing ? clampFrequency(existing.frequency) : brushFrequency,
+          );
+          setMenu({ hand, x: e.clientX, y: e.clientY });
         }}
       >
         <div className="flex h-8 items-center justify-center bg-[var(--panel)] text-[10px] font-medium text-[var(--muted)]">
@@ -158,23 +148,19 @@ export function RangeGrid({
             </div>
             {RANKS.map((_, col) => {
               const hand = handLabel(row, col);
-              const cell = cells[hand] ?? { action: "fold" as ActionId, frequency: 100 };
-              const meta = actionMeta(cell.action);
+              const cell = cells[hand] ?? emptyCell();
               const isPair = row === col;
-              const freq =
-                cell.action === "fold" ? 100 : clampFrequency(cell.frequency);
-              const showPartial = cell.action !== "fold" && freq < 100;
+              const total = cellTotal(cell);
               const labelColor =
-                cell.action === "fold" || (showPartial && freq < 45)
-                  ? foldMeta.text
-                  : meta.text;
+                total >= 45 ? "#ffffff" : foldMeta.text;
 
               return (
                 <div
                   key={hand}
                   data-hand={hand}
                   role="gridcell"
-                  aria-label={`${hand} ${meta.label} ${freq}%`}
+                  aria-label={`${hand} ${cellSummary(cell)}`}
+                  title={cellSummary(cell)}
                   className="relative h-10 touch-none overflow-hidden text-[10px] font-semibold transition-[filter,transform] duration-75 hover:brightness-110 sm:h-11 sm:text-[11px]"
                   style={{
                     backgroundColor: foldMeta.color,
@@ -184,16 +170,22 @@ export function RangeGrid({
                     cursor: "crosshair",
                   }}
                 >
-                  {cell.action !== "fold" ? (
-                    <span
-                      aria-hidden
-                      className="pointer-events-none absolute inset-x-0 bottom-0"
-                      style={{
-                        height: `${freq}%`,
-                        backgroundColor: meta.color,
-                      }}
-                    />
-                  ) : null}
+                  {/* Multi-color: stacked bottom-up bars by frequency % */}
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col-reverse"
+                    style={{ height: "100%" }}
+                  >
+                    {cell.parts.map((part) => (
+                      <span
+                        key={part.action}
+                        style={{
+                          height: `${clampFrequency(part.frequency)}%`,
+                          backgroundColor: actionMeta(part.action).color,
+                        }}
+                      />
+                    ))}
+                  </span>
                   <span
                     className="pointer-events-none relative z-[1] flex h-full w-full items-center justify-center"
                     style={{ color: labelColor }}
@@ -208,7 +200,7 @@ export function RangeGrid({
       </div>
 
       <p className="mt-3 text-sm text-[var(--muted)]">
-        左鍵拖曳上色；再點相同行動與頻率可清除。右鍵設定頻率（預設 100%）。對角線為對子，右上同花（s），左下雜色（o）。
+        左鍵拖曳上色；同一格可疊加多種行動（總和 ≤ 100%），超過則覆蓋為目前畫筆。右鍵設定頻率。對角線為對子，右上同花（s），左下雜色（o）。
       </p>
 
       <ul className="mt-2 flex flex-wrap gap-3 text-xs text-[var(--muted)]">
@@ -229,21 +221,24 @@ export function RangeGrid({
           ref={menuRef}
           role="dialog"
           aria-label={`${menu.hand} 頻率設定`}
-          className="fixed z-50 w-[220px] rounded-lg border border-[var(--line)] bg-[var(--panel)] p-3 shadow-[0_16px_40px_rgba(20,40,28,0.28)]"
+          className="fixed z-50 w-[240px] rounded-lg border border-[var(--line)] bg-[var(--panel)] p-3 shadow-[0_16px_40px_rgba(20,40,28,0.28)]"
           style={{
-            left: Math.min(menu.x, window.innerWidth - 236),
-            top: Math.min(menu.y, window.innerHeight - 180),
+            left: Math.min(menu.x, window.innerWidth - 256),
+            top: Math.min(menu.y, window.innerHeight - 220),
           }}
         >
           <div className="text-sm font-semibold text-[var(--ink)]">
             {menu.hand}
             <span className="ml-1.5 font-normal text-[var(--muted)]">
-              {actionMeta(menu.action).label}
+              {actionMeta(brush).label}
             </span>
           </div>
+          <p className="mt-1 text-xs leading-relaxed text-[var(--muted)]">
+            現況：{cellSummary(cells[menu.hand] ?? emptyCell())}
+          </p>
           <label className="mt-3 block space-y-1.5">
             <span className="flex items-center justify-between text-xs text-[var(--muted)]">
-              頻率
+              套用頻率
               <span className="font-semibold tabular-nums text-[var(--ink)]">
                 {clampFrequency(draftFreq)}%
               </span>

@@ -5,14 +5,14 @@ import { RangeGrid } from "@/components/RangeGrid";
 import {
   ACTIONS,
   ActionId,
-  CellState,
   POSITIONS,
   Position,
   RangeChart,
-  cellState,
+  applyPaint,
   clampFrequency,
   createRange,
   deleteRange,
+  emptyCell,
   loadRanges,
   upsertRange,
 } from "@/lib/range";
@@ -35,46 +35,18 @@ export function RangeWorkspace() {
   const onPaint = useCallback(
     (hand: string, action: ActionId, frequency: number) => {
       setCurrent((prev) => {
-        const existing = prev.cells[hand] ?? cellState("fold", 100);
-        const nextFreq = clampFrequency(frequency);
-        const matchesBrush =
-          existing.action === action &&
-          (action === "fold" ||
-            clampFrequency(existing.frequency) === nextFreq);
-
-        // Same brush action+frequency → clear (empty / fold).
-        if (matchesBrush && action !== "fold") {
-          return {
-            ...prev,
-            cells: { ...prev.cells, [hand]: cellState("fold", 100) },
-          };
-        }
-
+        const existing = prev.cells[hand] ?? emptyCell();
         return {
           ...prev,
           cells: {
             ...prev.cells,
-            [hand]:
-              action === "fold"
-                ? cellState("fold", 100)
-                : cellState(action, nextFreq),
+            [hand]: applyPaint(existing, action, frequency),
           },
         };
       });
     },
     [],
   );
-
-  const onSetCell = useCallback((hand: string, state: CellState) => {
-    setCurrent((prev) => ({
-      ...prev,
-      cells: { ...prev.cells, [hand]: state },
-    }));
-    if (state.action !== "fold") {
-      setBrush(state.action);
-      setBrushFrequency(state.frequency);
-    }
-  }, []);
 
   function handleSave() {
     const next = upsertRange({
@@ -219,7 +191,7 @@ export function RangeWorkspace() {
             </span>
           </label>
           <span className="text-xs text-[var(--muted)]">
-            左鍵拖曳套用此頻率；右鍵可單獨調整某格。
+            總和 ≤ 100% 可疊色；超過則覆蓋。棄牌畫筆可清空格子。
           </span>
         </div>
 
@@ -228,7 +200,7 @@ export function RangeWorkspace() {
           brush={brush}
           brushFrequency={brushFrequency}
           onPaint={onPaint}
-          onSetCell={onSetCell}
+          onBrushFrequencyChange={setBrushFrequency}
         />
 
         <div className="flex flex-wrap gap-3">

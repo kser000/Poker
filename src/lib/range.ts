@@ -16,7 +16,10 @@ export const RANKS = [
 
 export type Rank = (typeof RANKS)[number];
 
-export type ActionId = "fold" | "call" | "raise" | "allin" | "mix";
+export type ActionId = "fold" | "call" | "raise" | "allin";
+
+/** Non-fold paint actions that can share a cell. */
+export type PaintActionId = Exclude<ActionId, "fold">;
 
 export type Position =
   | "UTG"
@@ -51,13 +54,18 @@ export const ACTIONS: {
   { id: "call", label: "跟注 Call", color: "#3d9a6a", text: "#ffffff" },
   { id: "raise", label: "加注 Raise", color: "#d64545", text: "#ffffff" },
   { id: "allin", label: "全下 All-in", color: "#c47b16", text: "#ffffff" },
-  { id: "mix", label: "混合 Mix", color: "#2f6fed", text: "#ffffff" },
 ];
 
-/** Per-hand action with frequency 0–100 (percent of cell filled). */
-export type CellState = {
-  action: ActionId;
+const PAINT_IDS: PaintActionId[] = ["call", "raise", "allin"];
+
+export type CellPart = {
+  action: PaintActionId;
   frequency: number;
+};
+
+/** Empty `parts` = 棄牌／空白格. Multiple parts = multi-color split. */
+export type CellState = {
+  parts: CellPart[];
 };
 
 export type CellMap = Record<string, CellState>;
@@ -78,30 +86,90 @@ export function clampFrequency(n: number): number {
   return Math.min(100, Math.max(0, Math.round(n)));
 }
 
-export function cellState(
-  action: ActionId = "fold",
-  frequency = 100,
-): CellState {
-  return { action, frequency: clampFrequency(frequency) };
+export function emptyCell(): CellState {
+  return { parts: [] };
 }
 
-/** Migrate legacy `ActionId` string cells or partial objects → CellState. */
+export function isPaintAction(id: string): id is PaintActionId {
+  return PAINT_IDS.includes(id as PaintActionId);
+}
+
+export function cellTotal(cell: CellState): number {
+  return cell.parts.reduce((sum, p) => sum + clampFrequency(p.frequency), 0);
+}
+
+export function normalizeParts(parts: CellPart[]): CellPart[] {
+  const byAction = new Map<PaintActionId, number>();
+  for (const part of parts) {
+    if (!isPaintAction(part.action)) continue;
+    const freq = clampFrequency(part.frequency);
+    if (freq <= 0) continue;
+    byAction.set(part.action, freq);
+  }
+  const ordered: CellPart[] = [];
+  for (const id of PAINT_IDS) {
+    const freq = byAction.get(id);
+    if (freq) ordered.push({ action: id, frequency: freq });
+  }
+  return ordered;
+}
+
+/**
+ * Apply brush to a cell.
+ * - fold / 0% → clear
+ * - else set that action’s frequency; keep other colors if sum ≤ 100%
+ * - if sum would exceed 100% → overwrite cell with only the new paint
+ */
+export function applyPaint(
+  cell: CellState,
+  action: ActionId,
+  frequency: number,
+): CellState {
+  const freq = clampFrequency(frequency);
+  if (action === "fold" || freq <= 0) return emptyCell();
+  if (!isPaintAction(action)) return emptyCell();
+
+  const others = cell.parts.filter((p) => p.action !== action);
+  const otherSum = others.reduce((s, p) => s + clampFrequency(p.frequency), 0);
+
+  if (otherSum + freq > 100) {
+    return { parts: [{ action, frequency: freq }] };
+  }
+  return { parts: normalizeParts([...others, { action, frequency: freq }]) };
+}
+
+/** Migrate legacy string / single-action / mix cells → multi-part CellState. */
 export function normalizeCell(raw: unknown): CellState {
   if (typeof raw === "string") {
-    const action = (ACTIONS.some((a) => a.id === raw) ? raw : "fold") as ActionId;
-    return cellState(action, 100);
+    if (raw === "fold" || raw === "mix") return emptyCell();
+    if (isPaintAction(raw)) {
+      return { parts: [{ action: raw, frequency: 100 }] };
+    }
+    return emptyCell();
   }
-  if (raw && typeof raw === "object") {
-    const obj = raw as { action?: unknown; frequency?: unknown };
-    const action =
-      typeof obj.action === "string" && ACTIONS.some((a) => a.id === obj.action)
-        ? (obj.action as ActionId)
-        : "fold";
-    const frequency =
-      typeof obj.frequency === "number" ? obj.frequency : 100;
-    return cellState(action, frequency);
+  if (!raw || typeof raw !== "object") return emptyCell();
+
+  const obj = raw as {
+    action?: unknown;
+    frequency?: unknown;
+    parts?: unknown;
+  };
+
+  if (Array.isArray(obj.parts)) {
+    return { parts: normalizeParts(obj.parts as CellPart[]) };
   }
-  return cellState("fold", 100);
+
+  if (typeof obj.action === "string") {
+    if (obj.action === "fold" || obj.action === "mix") return emptyCell();
+    if (isPaintAction(obj.action)) {
+      const frequency =
+        typeof obj.frequency === "number" ? clampFrequency(obj.frequency) : 100;
+      if (frequency <= 0) return emptyCell();
+      return { parts: [{ action: obj.action, frequency }] };
+    }
+  }
+
+  return emptyCell();
 }
 
 export function normalizeCells(raw: unknown): CellMap {
@@ -126,7 +194,7 @@ export function emptyCells(): CellMap {
   const cells: CellMap = {};
   for (let r = 0; r < 13; r++) {
     for (let c = 0; c < 13; c++) {
-      cells[handLabel(r, c)] = cellState("fold", 100);
+      cells[handLabel(r, c)] = emptyCell();
     }
   }
   return cells;
@@ -201,4 +269,11 @@ export function deleteRange(id: string): RangeChart[] {
 
 export function actionMeta(id: ActionId) {
   return ACTIONS.find((a) => a.id === id) ?? ACTIONS[0];
+}
+
+export function cellSummary(cell: CellState): string {
+  if (cell.parts.length === 0) return "棄牌";
+  return cell.parts
+    .map((p) => `${actionMeta(p.action).label} ${clampFrequency(p.frequency)}%`)
+    .join(" · ");
 }
