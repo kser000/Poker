@@ -22,9 +22,11 @@ export function RangesList() {
       await migrateLegacyIfNeeded();
       const ranges = await fetchRangesFromApi();
       setList(ranges);
-    } catch {
+    } catch (err) {
       setList(loadCachedRanges());
-      setError("無法連線資料庫，顯示本機快取。");
+      const detail =
+        err instanceof Error && err.message ? err.message : "未知錯誤";
+      setError(`無法連線資料庫，顯示本機快取。（${detail}）`);
     } finally {
       setSyncing(false);
     }
@@ -62,7 +64,7 @@ export function RangesList() {
             我的範圍表
           </h1>
           <p className="mt-1 text-sm text-[var(--muted)]">
-            共 {list.length} 份 · 來源 E:\Poker\db\ranges.sqlite
+            共 {list.length} 份 · 來源本機 SQLite
             {syncing ? " · 同步中…" : ""}
           </p>
         </div>

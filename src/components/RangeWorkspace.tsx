@@ -57,8 +57,14 @@ export function RangeWorkspace() {
           const found = list.find((r) => r.id === loadId);
           if (found) setCurrent({ ...found, cells: { ...found.cells } });
         }
-      } catch {
-        if (!cancelled) setError("無法連線資料庫，已使用本機快取。");
+      } catch (err) {
+        if (!cancelled) {
+          const detail =
+            err instanceof Error && err.message
+              ? err.message
+              : "未知錯誤";
+          setError(`無法連線資料庫，已使用本機快取。（${detail}）`);
+        }
       } finally {
         if (!cancelled) setSyncing(false);
       }
@@ -139,7 +145,7 @@ export function RangeWorkspace() {
             範圍設計器
           </h1>
           <p className="mt-1 text-sm text-[var(--muted)]">
-            資料存於 E:\Poker\db（SQLite），瀏覽器保留快取。
+            資料存於本機 SQLite（E 槽 Poker/db），瀏覽器保留快取。
             {syncing ? " 同步中…" : ""}
           </p>
         </div>

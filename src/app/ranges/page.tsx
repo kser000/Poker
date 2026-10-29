@@ -17,7 +17,7 @@ export default function RangesPage() {
       </main>
 
       <footer className="mt-10 text-sm text-[var(--muted)]">
-        V1 · 資料目錄 E:\Poker\db
+        V1 · 資料目錄：E 槽 Poker/db
       </footer>
     </>
   );

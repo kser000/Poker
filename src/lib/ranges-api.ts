@@ -15,10 +15,20 @@ async function readJson(res: Response): Promise<unknown> {
   }
 }
 
+function apiErrorMessage(data: unknown, fallback: string): string {
+  if (data && typeof data === "object" && "error" in data) {
+    const err = (data as { error?: unknown }).error;
+    if (typeof err === "string" && err.trim()) return err;
+  }
+  return fallback;
+}
+
 export async function fetchRangesFromApi(): Promise<RangeChart[]> {
   const res = await fetch("/api/ranges", { cache: "no-store" });
-  if (!res.ok) throw new Error("無法載入範圍表");
   const data = await readJson(res);
+  if (!res.ok) {
+    throw new Error(apiErrorMessage(data, "無法載入範圍表"));
+  }
   const list = parseRangeList(
     data && typeof data === "object" && "ranges" in data
       ? (data as { ranges: unknown }).ranges
@@ -34,8 +44,10 @@ export async function upsertRangeApi(range: RangeChart): Promise<RangeChart> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(range),
   });
-  if (!res.ok) throw new Error("儲存失敗");
-  const data = (await readJson(res)) as { range?: unknown };
+  const data = (await readJson(res)) as { range?: unknown; error?: string };
+  if (!res.ok) {
+    throw new Error(apiErrorMessage(data, "儲存失敗"));
+  }
   const saved = parseRangeList(data?.range ? [data.range] : [])[0];
   if (!saved) throw new Error("儲存回應無效");
   const cached = loadCachedRanges();
@@ -50,7 +62,10 @@ export async function deleteRangeApi(id: string): Promise<void> {
   const res = await fetch(`/api/ranges/${encodeURIComponent(id)}`, {
     method: "DELETE",
   });
-  if (!res.ok) throw new Error("刪除失敗");
+  const data = await readJson(res);
+  if (!res.ok) {
+    throw new Error(apiErrorMessage(data, "刪除失敗"));
+  }
   saveCachedRanges(loadCachedRanges().filter((r) => r.id !== id));
 }
 

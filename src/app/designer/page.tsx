@@ -10,7 +10,7 @@ export default function DesignerPage() {
         </p>
         <p className="mt-2 max-w-2xl text-base leading-relaxed text-[var(--muted)]">
           拖曳標記行動與頻率（可多色疊加），右鍵調整比例，懸停放大查看。資料存於本機
-          E:\Poker。
+          E 槽 Poker 目錄。
         </p>
       </header>
 

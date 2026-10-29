@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { listRanges, upsertRangeDb } from "@/lib/db";
+import { getActiveDbPath, listRanges, upsertRangeDb } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -7,7 +7,10 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const ranges = listRanges();
-    return NextResponse.json({ ranges });
+    return NextResponse.json({
+      ranges,
+      dbPath: getActiveDbPath(),
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "讀取失敗";
     return NextResponse.json({ error: message }, { status: 500 });

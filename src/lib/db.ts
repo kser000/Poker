@@ -1,5 +1,5 @@
 import Database from "better-sqlite3";
-import { DB_PATH, ensureDataDirs } from "@/lib/paths";
+import { ensureDataDirs, getDbPath } from "@/lib/paths";
 import {
   RangeChart,
   normalizeCells,
@@ -18,11 +18,12 @@ type RangeRow = {
 
 type DbGlobal = typeof globalThis & {
   __pokerDb?: Database.Database;
+  __pokerDbPath?: string;
 };
 
 function openDb(): Database.Database {
-  ensureDataDirs();
-  const db = new Database(DB_PATH);
+  const { dbPath } = ensureDataDirs();
+  const db = new Database(dbPath);
   db.pragma("journal_mode = WAL");
   db.exec(`
     CREATE TABLE IF NOT EXISTS ranges (
@@ -35,15 +36,29 @@ function openDb(): Database.Database {
     );
     CREATE INDEX IF NOT EXISTS idx_ranges_updated ON ranges(updated_at DESC);
   `);
+  const g = globalThis as DbGlobal;
+  g.__pokerDbPath = dbPath;
   return db;
 }
 
 export function getDb(): Database.Database {
   const g = globalThis as DbGlobal;
-  if (!g.__pokerDb) {
+  const pathNow = getDbPath();
+  // Reopen if data root/path changed (e.g. env override in tests).
+  if (!g.__pokerDb || g.__pokerDbPath !== pathNow) {
+    try {
+      g.__pokerDb?.close();
+    } catch {
+      /* ignore */
+    }
     g.__pokerDb = openDb();
   }
   return g.__pokerDb;
+}
+
+export function getActiveDbPath(): string {
+  getDb();
+  return (globalThis as DbGlobal).__pokerDbPath ?? getDbPath();
 }
 
 function rowToRange(row: RangeRow): RangeChart {

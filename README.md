@@ -36,7 +36,7 @@ E:\Poker\
 └── docs\
 ```
 
-可選環境變數：`POKER_DATA_ROOT`（預設 `E:\Poker`）。
+可選環境變數：`POKER_DATA_ROOT`（預設 `E:\Poker`）。若 `E:\Poker` 無法寫入（exFAT 損毀目錄），會自動改用 `E:\PokerData`。舊損毀資料夾可能殘留為 `E:\Poker.corrupt`。
 
 ## 授權與用途
 
