@@ -17,8 +17,8 @@ npm install
 npm run dev
 ```
 
-- 範圍設計器：[http://localhost:3000/designer](http://localhost:3000/designer)
-- 我的範圍表：[http://localhost:3000/ranges](http://localhost:3000/ranges)
+- 範圍設計器：[http://localhost:3001/designer](http://localhost:3001/designer)
+- 我的範圍表：[http://localhost:3001/ranges](http://localhost:3001/ranges)
 
 ## V1 功能
 
