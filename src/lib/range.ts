@@ -228,6 +228,61 @@ export function handLabel(row: number, col: number): string {
   return `${r2}${r1}o`;
 }
 
+/** Combo weight: pair 6, suited 4, offsuit 12. Total 1326. */
+export function handComboWeight(hand: string): number {
+  if (hand.endsWith("s")) return 4;
+  if (hand.endsWith("o")) return 12;
+  return 6;
+}
+
+export const TOTAL_COMBOS = 1326;
+
+export type RangeFreqRow = {
+  action: ActionId;
+  combos: number;
+  percent: number;
+};
+
+/**
+ * GTO Wizard–style weighted action mix across the 169 grid.
+ * Each cell contributes `weight × (freq/100)` to painted actions;
+ * remainder of the weight goes to fold.
+ */
+export function summarizeRangeFrequencies(cells: CellMap): RangeFreqRow[] {
+  const combos: Record<ActionId, number> = {
+    fold: 0,
+    call: 0,
+    raise: 0,
+    allin: 0,
+  };
+
+  for (let r = 0; r < 13; r++) {
+    for (let c = 0; c < 13; c++) {
+      const hand = handLabel(r, c);
+      const weight = handComboWeight(hand);
+      const cell = cells[hand] ?? emptyCell();
+      let used = 0;
+      for (const part of cell.parts) {
+        const frac = clampFrequency(part.frequency) / 100;
+        combos[part.action] += weight * frac;
+        used += frac;
+      }
+      const foldFrac = Math.max(0, 1 - used);
+      combos.fold += weight * foldFrac;
+    }
+  }
+
+  const order: ActionId[] = ["raise", "call", "allin", "fold"];
+  return order.map((action) => {
+    const n = combos[action];
+    return {
+      action,
+      combos: n,
+      percent: TOTAL_COMBOS > 0 ? (n / TOTAL_COMBOS) * 100 : 0,
+    };
+  });
+}
+
 export function emptyCells(): CellMap {
   const cells: CellMap = {};
   for (let r = 0; r < 13; r++) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { RangeFreqSummary } from "@/components/RangeFreqSummary";
 import {
   ACTIONS,
   ActionId,
@@ -121,7 +122,9 @@ export function RangeGrid({
   const foldMeta = actionMeta("fold");
 
   return (
-    <div className="relative w-full overflow-x-auto pb-2">
+    <div className="relative w-full pb-2">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+      <div className="min-w-0 flex-1 overflow-x-auto">
       <div
         ref={gridRef}
         className="inline-grid min-w-[640px] select-none gap-px rounded-sm bg-[color-mix(in_oklab,var(--ink)_18%,transparent)] p-px shadow-[0_12px_40px_rgba(20,40,28,0.18)]"
@@ -260,9 +263,13 @@ export function RangeGrid({
           </div>
         ))}
       </div>
+      </div>
+
+      <RangeFreqSummary cells={cells} />
+      </div>
 
       <p className="mt-3 text-sm text-[var(--muted)]">
-        左鍵點擊：相同行動與頻率可清除；拖曳只上色。可疊加多種行動（總和 ≤ 100%，超過則覆蓋）。懸停放大；右鍵設頻率。對角線為對子，右上同花（s），左下雜色（o）。
+        左鍵點擊：相同行動與頻率可清除；拖曳只上色。可疊加多種行動（總和 ≤ 100%，超過則覆蓋）。懸停放大；右鍵設頻率。對角線為對子，右上同花（s），左下雜色（o）。右側為整體頻率（組合加權）。
       </p>
 
       <ul className="mt-2 flex flex-wrap gap-3 text-xs text-[var(--muted)]">
