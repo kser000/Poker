@@ -77,14 +77,19 @@ export function RangeWorkspace() {
   }, [loadId]);
 
   const onPaint = useCallback(
-    (hand: string, action: ActionId, frequency: number) => {
+    (
+      hand: string,
+      action: ActionId,
+      frequency: number,
+      options?: { allowToggle?: boolean },
+    ) => {
       setCurrent((prev) => {
         const existing = prev.cells[hand] ?? emptyCell();
         return {
           ...prev,
           cells: {
             ...prev.cells,
-            [hand]: applyPaint(existing, action, frequency),
+            [hand]: applyPaint(existing, action, frequency, options),
           },
         };
       });
@@ -256,7 +261,7 @@ export function RangeWorkspace() {
           </span>
         </label>
         <span className="text-xs text-[var(--muted)]">
-          總和 ≤ 100% 可疊色；超過則覆蓋。懸停格子可放大查看頻率。
+          點擊相同行動＋頻率可清除；拖曳只上色。總和 ≤ 100% 可疊色。
         </span>
       </div>
 

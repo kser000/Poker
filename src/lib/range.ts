@@ -118,18 +118,52 @@ export function normalizeParts(parts: CellPart[]): CellPart[] {
   return ordered;
 }
 
+/** True if this action already sits on the cell at exactly `frequency`. */
+export function cellMatchesBrush(
+  cell: CellState,
+  action: ActionId,
+  frequency: number,
+): boolean {
+  const freq = clampFrequency(frequency);
+  if (action === "fold" || freq <= 0) {
+    return cell.parts.length === 0;
+  }
+  if (!isPaintAction(action)) return false;
+  const part = cell.parts.find((p) => p.action === action);
+  return (
+    part != null && clampFrequency(part.frequency) === freq
+  );
+}
+
+/** Remove one action from a multi-color cell (empty if none left). */
+export function clearActionFromCell(
+  cell: CellState,
+  action: ActionId,
+): CellState {
+  if (!isPaintAction(action)) return emptyCell();
+  return {
+    parts: normalizeParts(cell.parts.filter((p) => p.action !== action)),
+  };
+}
+
 /**
  * Apply brush to a cell.
  * - fold / 0% → clear
  * - else set that action’s frequency; keep other colors if sum ≤ 100%
  * - if sum would exceed 100% → overwrite cell with only the new paint
+ * - allowToggle (left-click only): matching action+freq removes that action
  */
 export function applyPaint(
   cell: CellState,
   action: ActionId,
   frequency: number,
+  options?: { allowToggle?: boolean },
 ): CellState {
   const freq = clampFrequency(frequency);
+  if (options?.allowToggle && cellMatchesBrush(cell, action, frequency)) {
+    if (action === "fold" || freq <= 0) return cell;
+    return clearActionFromCell(cell, action);
+  }
   if (action === "fold" || freq <= 0) return emptyCell();
   if (!isPaintAction(action)) return emptyCell();
 

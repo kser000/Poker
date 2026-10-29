@@ -19,7 +19,12 @@ type Props = {
   cells: CellMap;
   brush: ActionId;
   brushFrequency: number;
-  onPaint: (hand: string, action: ActionId, frequency: number) => void;
+  onPaint: (
+    hand: string,
+    action: ActionId,
+    frequency: number,
+    options?: { allowToggle?: boolean },
+  ) => void;
   onBrushFrequencyChange: (frequency: number) => void;
 };
 
@@ -64,6 +69,8 @@ export function RangeGrid({
   onBrushFrequencyChange,
 }: Props) {
   const painting = useRef(false);
+  const dragging = useRef(false);
+  const startHand = useRef<string | null>(null);
   const lastHand = useRef<string | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -72,10 +79,10 @@ export function RangeGrid({
   const [hover, setHover] = useState<HoverInfo | null>(null);
 
   const paint = useCallback(
-    (hand: string) => {
+    (hand: string, allowToggle = false) => {
       if (lastHand.current === hand) return;
       lastHand.current = hand;
-      onPaint(hand, brush, brushFrequency);
+      onPaint(hand, brush, brushFrequency, { allowToggle });
     },
     [brush, brushFrequency, onPaint],
   );
@@ -129,14 +136,25 @@ export function RangeGrid({
           setMenu(null);
           setHover(null);
           painting.current = true;
+          dragging.current = false;
+          startHand.current = hand;
           lastHand.current = null;
           gridRef.current?.setPointerCapture(e.pointerId);
-          paint(hand);
+          // Defer paint until move (drag) or up (click toggle).
         }}
         onPointerMove={(e) => {
           if (painting.current) {
             const hand = handFromPoint(e.clientX, e.clientY);
-            if (hand) paint(hand);
+            if (!hand) return;
+            if (!dragging.current && hand !== startHand.current) {
+              dragging.current = true;
+              // Drag mode: paint start cell without toggle, then continue.
+              if (startHand.current) {
+                lastHand.current = null;
+                paint(startHand.current, false);
+              }
+            }
+            if (dragging.current) paint(hand, false);
             return;
           }
           if (menu) return;
@@ -157,11 +175,19 @@ export function RangeGrid({
           if (!painting.current) setHover(null);
         }}
         onPointerUp={() => {
+          if (painting.current && !dragging.current && startHand.current) {
+            lastHand.current = null;
+            paint(startHand.current, true);
+          }
           painting.current = false;
+          dragging.current = false;
+          startHand.current = null;
           lastHand.current = null;
         }}
         onPointerCancel={() => {
           painting.current = false;
+          dragging.current = false;
+          startHand.current = null;
           lastHand.current = null;
         }}
         onContextMenu={(e) => {
@@ -236,7 +262,7 @@ export function RangeGrid({
       </div>
 
       <p className="mt-3 text-sm text-[var(--muted)]">
-        左鍵拖曳上色；可疊加多種行動（總和 ≤ 100%，超過則覆蓋）。懸停放大查看頻率；右鍵設定頻率。對角線為對子，右上同花（s），左下雜色（o）。
+        左鍵點擊：相同行動與頻率可清除；拖曳只上色。可疊加多種行動（總和 ≤ 100%，超過則覆蓋）。懸停放大；右鍵設頻率。對角線為對子，右上同花（s），左下雜色（o）。
       </p>
 
       <ul className="mt-2 flex flex-wrap gap-3 text-xs text-[var(--muted)]">
